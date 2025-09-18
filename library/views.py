@@ -6,13 +6,20 @@ from rest_framework.decorators import action
 from django.utils import timezone
 from datetime import timedelta
 from .tasks import send_loan_notification
+from django.db.models import Prefetch
+
+
+def get_optimised_book_query_set():
+    return Book.objects.select_related('author').prefetch_related(
+        Prefetch("author__books")
+    )
 
 class AuthorViewSet(viewsets.ModelViewSet):
     queryset = Author.objects.all()
     serializer_class = AuthorSerializer
 
 class BookViewSet(viewsets.ModelViewSet):
-    queryset = Book.objects.all()
+    queryset = get_optimised_book_query_set()
     serializer_class = BookSerializer
 
     @action(detail=True, methods=['post'])
