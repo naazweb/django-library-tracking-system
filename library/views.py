@@ -10,9 +10,7 @@ from django.db.models import Prefetch
 
 
 def get_optimised_book_query_set():
-    return Book.objects.select_related('author').prefetch_related(
-        Prefetch("author__books")
-    )
+    return Book.objects.select_related('author')
 
 class AuthorViewSet(viewsets.ModelViewSet):
     queryset = Author.objects.all()
