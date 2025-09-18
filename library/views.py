@@ -1,9 +1,10 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from .models import Author, Book, Member, Loan
-from .serializers import AuthorSerializer, BookSerializer, MemberSerializer, LoanSerializer
+from .serializers import AuthorSerializer, BookSerializer, MemberSerializer, LoanSerializer, ExtendDueDateSerializer
 from rest_framework.decorators import action
 from django.utils import timezone
+from datetime import timedelta
 from .tasks import send_loan_notification
 
 class AuthorViewSet(viewsets.ModelViewSet):
@@ -52,3 +53,32 @@ class MemberViewSet(viewsets.ModelViewSet):
 class LoanViewSet(viewsets.ModelViewSet):
     queryset = Loan.objects.all()
     serializer_class = LoanSerializer
+
+    @action(detail=True, methods=["POST"])
+    def extend_due_date(self, request, pk=None):
+        try:
+            loan = self.get_object()
+            today = timezone.now().date()
+            extend_due_date_serializer = ExtendDueDateSerializer(data=request.data)
+            if not extend_due_date_serializer.is_valid():
+                return Response({
+                    "error": "additional_days should be a positive integer"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            if loan.due_date > today and not loan.is_returned:
+                loan.due_date += timedelta(days=extend_due_date_serializer.validated_data.get('additional_days'))
+                loan.save()
+
+                return Response({
+                    "status": "Success",
+                    "loan": LoanSerializer(loan).data
+                })
+            return Response({
+                "error": "Cannot extend due date or already returned"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({
+                "error": f'Something went wrong: {e}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
